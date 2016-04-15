@@ -1,4 +1,4 @@
-from sklearn.tree import DecisionTreeRegressor
+from sklearn import tree
 
-dt = DecisionTreeRegressor()
-dt.fit([[1],[2],[3]],[5,6,7], [1,2,1])
+dt = tree.DecisionTreeRegressor()
+dt.fit([[1],[2],[3]],[5,6,7])

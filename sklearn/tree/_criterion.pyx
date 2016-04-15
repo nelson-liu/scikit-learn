@@ -866,8 +866,13 @@ cdef class RegressionCriterion(Criterion):
         """Compute the node value of samples[start:end] into dest."""
 
         cdef SIZE_t k
+        printf('\n ented node_value method \n')
         for k in range(self.n_outputs):
             dest[k] = self.sum_total[k] / self.weighted_n_node_samples
+            printf('k')
+            printf("\n %lf \n", k)
+            printf('dest[k]')
+            printf("\n %lf \n", dest[k])
 
 
 cdef class MSE(RegressionCriterion):
@@ -889,7 +894,7 @@ cdef class MSE(RegressionCriterion):
         # decision tree takes in a sample weight parameter
         # this is the sum of the weights
         printf("self.weighted_n_node_samples")
-        printf("\n %lf \n", self.weighted_n_node_samples) 
+        printf("\n %lf \n", self.weighted_n_node_samples)
         impurity = self.sq_sum_total / self.weighted_n_node_samples
         printf("self.impurity")
         printf("\n %lf \n", impurity)

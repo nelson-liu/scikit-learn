@@ -19,6 +19,7 @@ from libc.stdlib cimport calloc
 from libc.stdlib cimport free
 from libc.string cimport memcpy
 from libc.string cimport memset
+from libc.stdio cimport printf
 
 import numpy as np
 cimport numpy as np
@@ -865,7 +866,6 @@ cdef class RegressionCriterion(Criterion):
         """Compute the node value of samples[start:end] into dest."""
 
         cdef SIZE_t k
-
         for k in range(self.n_outputs):
             dest[k] = self.sum_total[k] / self.weighted_n_node_samples
 
@@ -882,10 +882,24 @@ cdef class MSE(RegressionCriterion):
         cdef double* sum_total = self.sum_total
         cdef double impurity
         cdef SIZE_t k
+        # sq_sum_total is the sum of squares of the predicted labels
+        printf("sq_sum_total")
+        printf("\n %lf \n", self.sq_sum_total)
 
+        # decision tree takes in a sample weight parameter
+        # this is the sum of the weights
+        printf("self.weighted_n_node_samples")
+        printf("\n %lf \n", self.weighted_n_node_samples) 
         impurity = self.sq_sum_total / self.weighted_n_node_samples
+        printf("self.impurity")
+        printf("\n %lf \n", impurity)
         for k in range(self.n_outputs):
             impurity -= (sum_total[k] / self.weighted_n_node_samples)**2.0
+            # sum of labels multiplied by their weights
+            printf("sum_total[k]")
+            printf("\n %lf \n", sum_total[k])
+        printf("impurity after subtractions")
+        printf("\n %lf \n", impurity / self.n_outputs)
 
         return impurity / self.n_outputs
 

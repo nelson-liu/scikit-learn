@@ -739,6 +739,8 @@ cdef class RegressionCriterion(Criterion):
         # Initialize fields
         self.y = y
         self.y_stride = y_stride
+        with gil:
+            print "self.y_stride: {}".format(self.y_stride)
         self.sample_weight = sample_weight
         self.samples = samples
         self.start = start
@@ -755,6 +757,8 @@ cdef class RegressionCriterion(Criterion):
         cdef DOUBLE_t w = 1.0
 
         self.sq_sum_total = 0.0
+        with gil:
+            print "sizeof(double): {}".format(sizeof(double))
         memset(self.sum_total, 0, self.n_outputs * sizeof(double))
 
         for p in range(start, end):
@@ -866,14 +870,18 @@ cdef class RegressionCriterion(Criterion):
         """Compute the node value of samples[start:end] into dest."""
 
         cdef SIZE_t k
-        printf('\n ented node_value method \n')
+        with gil:
+            print ""
+            print "entered node value method"
         for k in range(self.n_outputs):
             dest[k] = self.sum_total[k] / self.weighted_n_node_samples
-            printf('k')
-            printf("\n %lf \n", k)
-            printf('dest[k]')
-            printf("\n %lf \n", dest[k])
-
+            with gil:
+                print "sum_total[k]: {}".format(self.sum_total[k])
+                print "weighted_n_node_samples: {}".format(self.weighted_n_node_samples)
+                print "k: {}".format(k)
+                print "dest[k]: {}".format(dest[k])
+        with gil:
+            print ""
 
 cdef class MSE(RegressionCriterion):
     """Mean squared error impurity criterion.
@@ -888,23 +896,24 @@ cdef class MSE(RegressionCriterion):
         cdef double impurity
         cdef SIZE_t k
         # sq_sum_total is the sum of squares of the predicted labels
-        printf("sq_sum_total")
-        printf("\n %lf \n", self.sq_sum_total)
-
+        with gil:
+            print("sq_sum_total: {}".format(self.sq_sum_total))
+        
         # decision tree takes in a sample weight parameter
         # this is the sum of the weights
-        printf("self.weighted_n_node_samples")
-        printf("\n %lf \n", self.weighted_n_node_samples)
+        with gil:
+            print("self.weighted_n_node_samples: {}".format(self.weighted_n_node_samples))
         impurity = self.sq_sum_total / self.weighted_n_node_samples
-        printf("self.impurity")
-        printf("\n %lf \n", impurity)
+        with gil:
+            print("self.impurity: {}".format(impurity))
         for k in range(self.n_outputs):
             impurity -= (sum_total[k] / self.weighted_n_node_samples)**2.0
             # sum of labels multiplied by their weights
-            printf("sum_total[k]")
-            printf("\n %lf \n", sum_total[k])
-        printf("impurity after subtractions")
-        printf("\n %lf \n", impurity / self.n_outputs)
+            with gil:
+                print("sum_total[k]: {}".format(sum_total[k]))
+        with gil:
+            print ("self.n_outputs: {}".format(self.n_outputs))
+            print("impurity after subtractions: {}".format(impurity / self.n_outputs))
 
         return impurity / self.n_outputs
 
@@ -928,6 +937,10 @@ cdef class MSE(RegressionCriterion):
         cdef double proxy_impurity_right = 0.0
 
         for k in range(self.n_outputs):
+            with gil:
+                print("k: {}".format(k))
+                print("sum_left[k]: {}".format(sum_left[k]))
+                print('sum_right[k]: {}'.format(sum_right[k]))
             proxy_impurity_left += sum_left[k] * sum_left[k]
             proxy_impurity_right += sum_right[k] * sum_right[k]
 

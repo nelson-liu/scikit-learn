@@ -132,6 +132,7 @@ cdef class DepthFirstTreeBuilder(TreeBuilder):
     def __cinit__(self, Splitter splitter, SIZE_t min_samples_split,
                   SIZE_t min_samples_leaf, double min_weight_leaf,
                   SIZE_t max_depth):
+        print "entered __cinit__ of DepthFirstTreeBuilder"
         self.splitter = splitter
         self.min_samples_split = min_samples_split
         self.min_samples_leaf = min_samples_leaf
@@ -582,6 +583,7 @@ cdef class Tree:
                   int n_outputs):
         """Constructor."""
         # Input/Output layout
+        print "entered __cinit__ of _tree.pyx"
         self.n_features = n_features
         self.n_outputs = n_outputs
         self.n_classes = NULL

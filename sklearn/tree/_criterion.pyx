@@ -19,7 +19,6 @@ from libc.stdlib cimport calloc
 from libc.stdlib cimport free
 from libc.string cimport memcpy
 from libc.string cimport memset
-from libc.stdio cimport printf
 
 import numpy as np
 cimport numpy as np
@@ -74,6 +73,9 @@ cdef class Criterion:
             The last sample used on this node
 
         """
+
+        with gil:
+            print "entered init of Criterion"
 
         pass
 
@@ -695,6 +697,7 @@ cdef class RegressionCriterion(Criterion):
         """
 
         # Default values
+        print "entered __cinit__ of RegressionCriterion"
         self.y = NULL
         self.y_stride = 0
         self.sample_weight = NULL
@@ -737,6 +740,8 @@ cdef class RegressionCriterion(Criterion):
         """Initialize the criterion at node samples[start:end] and
            children samples[start:start] and samples[start:end]."""
         # Initialize fields
+        with gil:
+            print "entered init of regressionCriterion"
         self.y = y
         self.y_stride = y_stride
         with gil:

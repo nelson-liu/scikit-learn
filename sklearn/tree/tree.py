@@ -47,6 +47,7 @@ __all__ = ["DecisionTreeClassifier",
            "ExtraTreeClassifier",
            "ExtraTreeRegressor"]
 
+import pdb
 
 # =============================================================================
 # Types and constants
@@ -148,23 +149,41 @@ class BaseDecisionTree(six.with_metaclass(ABCMeta, BaseEstimator,
         self : object
             Returns self.
         """
-
+        # Turn seed into a np.random.RandomState instance
+        # If seed is None, return the RandomState singleton used by np.random.
+        # If seed is an int, return a new RandomState instance seeded with seed.
+        # If seed is already a RandomState instance, return it.
+        # Otherwise, raise ValueError.
         random_state = check_random_state(self.random_state)
+
         if check_input:
+            # check_array performs input validation on an array, list,
+            # sparse matrix or similar.
+
+            # By default, the input is converted to an at least
+            # 2d numpy array during validation.
+            # If the dtype of the array is object, attempt converting to float,
+            # raising on failure. Returns the converted and validated X.
             X = check_array(X, dtype=DTYPE, accept_sparse="csc")
             y = check_array(y, ensure_2d=False, dtype=None)
+            # If our input data is sparse, we perform some more
+            # input validation.
             if issparse(X):
                 X.sort_indices()
 
                 if X.indices.dtype != np.intc or X.indptr.dtype != np.intc:
                     raise ValueError("No support for np.int64 index based "
                                      "sparse matrices")
-
         # Determine output settings
+        # set n samples and self.n_features according
+        # to the shape of the input array
         n_samples, self.n_features_ = X.shape
+        # check if fitting classifier or regressor
         is_classification = isinstance(self, ClassifierMixin)
 
+        # Convert inputs to arrays with at least one dimension.
         y = np.atleast_1d(y)
+        # expanded_class_weight is not used 
         expanded_class_weight = None
 
         if y.ndim == 1:
@@ -174,6 +193,7 @@ class BaseDecisionTree(six.with_metaclass(ABCMeta, BaseEstimator,
 
         self.n_outputs_ = y.shape[1]
 
+        # Our example is regression, so we jump to the else statement
         if is_classification:
             check_classification_targets(y)
             y = np.copy(y)
@@ -195,36 +215,54 @@ class BaseDecisionTree(six.with_metaclass(ABCMeta, BaseEstimator,
             if self.class_weight is not None:
                 expanded_class_weight = compute_sample_weight(
                     self.class_weight, y_original)
-
         else:
+            # initialize self.classes and self.n_classes_
             self.classes_ = [None] * self.n_outputs_
             self.n_classes_ = [1] * self.n_outputs_
 
+        # convert self.n_classes_ into a numpy array
         self.n_classes_ = np.array(self.n_classes_, dtype=np.intp)
 
+        # convert to contiguous array if necessary
         if getattr(y, "dtype", None) != DOUBLE or not y.flags.contiguous:
             y = np.ascontiguousarray(y, dtype=DOUBLE)
-
+        pdb.set_trace()
         # Check parameters
+        # set max_depth if it is defined, else set it to the max 32-bit int
         max_depth = ((2 ** 31) - 1 if self.max_depth is None
                      else self.max_depth)
+        # set max_leaf_nodes if it is defined, else set it to -1
         max_leaf_nodes = (-1 if self.max_leaf_nodes is None
                           else self.max_leaf_nodes)
 
+        # set min_samples_leaf depending on whether the input
+        # parameter is float or integer
         if isinstance(self.min_samples_leaf, (numbers.Integral, np.integer)):
+            # integer
             min_samples_leaf = self.min_samples_leaf
-        else:  # float
+        else:
+            # float
             min_samples_leaf = int(ceil(self.min_samples_leaf * n_samples))
 
+        # set min_samples_split depending on whether the input
+        # parameter is float or integer
         if isinstance(self.min_samples_split, (numbers.Integral, np.integer)):
+            # integer
             min_samples_split = self.min_samples_split
-        else:  # float
+        else:
+            # float
             min_samples_split = int(ceil(self.min_samples_split * n_samples))
             min_samples_split = max(2, min_samples_split)
 
+        # if both min_samples_split and min_samples_leaf are defined,
+        # set min_samples_split to the higher split value.
         min_samples_split = max(min_samples_split, 2 * min_samples_leaf)
 
+        # set max_features, the number of features to consider when
+        # looking for a best split depending on if the input parameter
+        # is a string, integer, or float
         if isinstance(self.max_features, six.string_types):
+            # string
             if self.max_features == "auto":
                 if is_classification:
                     max_features = max(1, int(np.sqrt(self.n_features_)))
@@ -239,18 +277,26 @@ class BaseDecisionTree(six.with_metaclass(ABCMeta, BaseEstimator,
                     'Invalid value for max_features. Allowed string '
                     'values are "auto", "sqrt" or "log2".')
         elif self.max_features is None:
+            # none
             max_features = self.n_features_
         elif isinstance(self.max_features, (numbers.Integral, np.integer)):
+            # integer
             max_features = self.max_features
-        else:  # float
+        else:
+            # float
             if self.max_features > 0.0:
                 max_features = max(1,
                                    int(self.max_features * self.n_features_))
             else:
                 max_features = 0
 
+        # set self.max_features_ to the numeric value of
+        # max_features
         self.max_features_ = max_features
 
+        # validation of various parameters
+
+        # validate n_samples, self.min_samples_split and self.min_samples_leaf
         if len(y) != n_samples:
             raise ValueError("Number of labels=%d does not match "
                              "number of samples=%d" % (len(y), n_samples))
@@ -263,6 +309,8 @@ class BaseDecisionTree(six.with_metaclass(ABCMeta, BaseEstimator,
             raise ValueError("min_samples_leaf must be at least than 1 "
                              "or in (0, 0.5], got %s" % min_samples_leaf)
 
+        # validate self.min_weight_fraction_leaf, max_depth,
+        # max_features, and max_leaf_nodes
         if not 0 <= self.min_weight_fraction_leaf <= 0.5:
             raise ValueError("min_weight_fraction_leaf must in [0, 0.5]")
         if max_depth <= 0:
@@ -276,6 +324,7 @@ class BaseDecisionTree(six.with_metaclass(ABCMeta, BaseEstimator,
             raise ValueError(("max_leaf_nodes {0} must be either smaller than "
                               "0 or larger than 1").format(max_leaf_nodes))
 
+        # set sample weight to contiguous array / perform validation
         if sample_weight is not None:
             if (getattr(sample_weight, "dtype", None) != DOUBLE or
                     not sample_weight.flags.contiguous):
@@ -289,7 +338,7 @@ class BaseDecisionTree(six.with_metaclass(ABCMeta, BaseEstimator,
                 raise ValueError("Number of weights=%d does not match "
                                  "number of samples=%d" %
                                  (len(sample_weight), n_samples))
-
+        # this is only necessary in classification
         if expanded_class_weight is not None:
             if sample_weight is not None:
                 sample_weight = sample_weight * expanded_class_weight
@@ -303,6 +352,7 @@ class BaseDecisionTree(six.with_metaclass(ABCMeta, BaseEstimator,
         else:
             min_weight_leaf = 0.
 
+        # set presort
         presort = self.presort
         # Allow presort to be 'auto', which means True if the dataset is dense,
         # otherwise it will be False.
@@ -331,6 +381,7 @@ class BaseDecisionTree(six.with_metaclass(ABCMeta, BaseEstimator,
                                                    X_idx_sorted.shape))
 
         # Build tree
+        # create criterion object
         criterion = self.criterion
         if not isinstance(criterion, Criterion):
             if is_classification:
@@ -338,7 +389,7 @@ class BaseDecisionTree(six.with_metaclass(ABCMeta, BaseEstimator,
                                                          self.n_classes_)
             else:
                 criterion = CRITERIA_REG[self.criterion](self.n_outputs_)
-
+ 
         SPLITTERS = SPARSE_SPLITTERS if issparse(X) else DENSE_SPLITTERS
 
         splitter = self.splitter
@@ -349,7 +400,7 @@ class BaseDecisionTree(six.with_metaclass(ABCMeta, BaseEstimator,
                                                 min_weight_leaf,
                                                 random_state,
                                                 self.presort)
-
+        # create tree
         self.tree_ = Tree(self.n_features_, self.n_classes_, self.n_outputs_)
 
         # Use BestFirst if max_leaf_nodes given; use DepthFirst otherwise

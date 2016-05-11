@@ -83,7 +83,8 @@ cdef class Splitter:
         random_state: object
             The user inputted random state to be used for pseudo-randomness
         """
-
+        # our criterion object, e.g.
+        # <sklearn.tree._criterion.MSE object at 0x10520a990>
         self.criterion = criterion
 
         self.samples = NULL
@@ -96,24 +97,43 @@ cdef class Splitter:
         self.y_stride = 0
         self.sample_weight = NULL
 
+        # max_features to consider per split
+        # self.max_features = 1, because the
+        # default is the  maximum
+        # amount of features in our input set.
         self.max_features = max_features
+
+        # minimum number of samples required to be a leaf node
+        # self.min_samples_leaf = 1, the default value
         self.min_samples_leaf = min_samples_leaf
+
+        # minimum weighted fraction of the input samples
+        # required to be at a leaf node.
+        # self.min_weight_leaf = 0, the default value
         self.min_weight_leaf = min_weight_leaf
+
+        # RandomState instance used by np.random, e.g.
+        # self.random_state = <mtrand.RandomState object at 0x103060b10>
         self.random_state = random_state
+
+        # whether or not to presort the data
+        # self.presort = False
         self.presort = presort
 
     def __dealloc__(self):
         """Destructor."""
-
+        print "entered __dealloc__ of Splitter"
         free(self.samples)
         free(self.features)
         free(self.constant_features)
         free(self.feature_values)
 
     def __getstate__(self):
+        print "entered __getstate__ of Splitter"
         return {}
 
     def __setstate__(self, d):
+        print "entered __setstate__ of Splitter"
         pass
 
     cdef void init(self,
@@ -138,8 +158,12 @@ cdef class Splitter:
             closer than lower weight samples. If not provided, all samples
             are assumed to have uniform weight.
         """
-
+        print "entered init of Splitter"
+        # set random state based on seed passed in
         self.rand_r_state = self.random_state.randint(0, RAND_R_MAX)
+
+        # number of input samples
+        # n_samples = 3
         cdef SIZE_t n_samples = X.shape[0]
 
         # Create a new array which will be used to store nonzero
@@ -152,33 +176,66 @@ cdef class Splitter:
 
         for i in range(n_samples):
             # Only work with positively weighted samples
+            # if no weights are specified, sample_weight is NULL
             if sample_weight == NULL or sample_weight[i] != 0.0:
+                # fill samples with temporary values
                 samples[j] = i
                 j += 1
 
             if sample_weight != NULL:
+                # weighted_n_samples keeps track of the total weight
+                # of all of the samples
+                # weighted_n_samples = 4.0 (1.0+2.0+1.0)
                 weighted_n_samples += sample_weight[i]
             else:
                 weighted_n_samples += 1.0
 
         # Number of samples is number of positively weighted samples
+        # self.n_samples = 3
         self.n_samples = j
+        # Total weight of all samples is sum of all positive weighted samples
+        # self.weighted_n_samples = 4
         self.weighted_n_samples = weighted_n_samples
 
+        # number of features in each sample
+        # n_features = 1
         cdef SIZE_t n_features = X.shape[1]
+
+        # Create a new array which will be used to store
+        # features from the sample of interest
         cdef SIZE_t* features = safe_realloc(&self.features, n_features)
 
         for i in range(n_features):
+            # fill the array with temporary values
             features[i] = i
 
+        # number of features in each sample
+        # n_features = 1
         self.n_features = n_features
 
+        # create the array used as a temp array to hold feature values
         safe_realloc(&self.feature_values, n_samples)
+
+        # create the array used to store feature ids with consant values
         safe_realloc(&self.constant_features, n_features)
 
+        # stores the values of the labels
+        # self.y = [2. 3. 6.]
         self.y = <DOUBLE_t*> y.data
+
+        # y.itemsize is the size of each item in the array
+        # y.itemsize = 8 because each double is 8 bytes
+
+        # y.strides[0] is the number of bytes to jump to reach the beginning
+        # of the next element in the array.
+        # y.strides[0] = 8
+
+        # self.y_stride is the number of indices away the next element in the array is.
+        # self.y_stride = 1, indicating that they are all consecutive.
         self.y_stride = <SIZE_t> y.strides[0] / <SIZE_t> y.itemsize
 
+        # self.sample_weight is set to the array of sample_weight s
+        # created earlier and filled with dummy values.
         self.sample_weight = sample_weight
 
     cdef void node_reset(self, SIZE_t start, SIZE_t end,
@@ -194,7 +251,8 @@ cdef class Splitter:
         weighted_n_node_samples: numpy.ndarray, dtype=double pointer
             The total weight of those samples
         """
-
+        with gil:
+            print "entered node_reset of splitter"
         self.start = start
         self.end = end
 
@@ -243,7 +301,6 @@ cdef class BaseDenseSplitter(Splitter):
     def __cinit__(self, Criterion criterion, SIZE_t max_features,
                   SIZE_t min_samples_leaf, double min_weight_leaf,
                   object random_state, bint presort):
-
         self.X = NULL
         self.X_sample_stride = 0
         self.X_feature_stride = 0
@@ -254,6 +311,7 @@ cdef class BaseDenseSplitter(Splitter):
 
     def __dealloc__(self):
         """Destructor."""
+        print "entered __dealloc__ of BaseDenseSplitter"
         if self.presort == 1:
             free(self.sample_mask)
 
@@ -263,17 +321,41 @@ cdef class BaseDenseSplitter(Splitter):
                    DOUBLE_t* sample_weight,
                    np.ndarray X_idx_sorted=None) except *:
         """Initialize the splitter."""
-
+        print "entered init of BaseDenseSplitter"
         # Call parent init
         Splitter.init(self, X, y, sample_weight)
+        print "done with parent init"
 
         # Initialize X
+        # X_ndarray = [[1.] [2.] [5.]]
         cdef np.ndarray X_ndarray = X
 
+        # X is a pointer to the data of X_ndarray
+        # X = [1. 2. 5.]
         self.X = <DTYPE_t*> X_ndarray.data
+
+        # X.itemsize is the size of each item in the array
+        # X.itemsize = 4 because each SIZE_t is 4 bytes
+
+        # X.strides[0] is the number of bytes to jump to reach the beginning
+        # of the next element (in this case samples) in the array.
+        # X.strides[0] = 4
+
+        # self.X_sample_stride is the number of indices away the next sample in the array is.
+        # self.X_sample_stride = 1, indicating that they are all consecutive.
         self.X_sample_stride = <SIZE_t> X.strides[0] / <SIZE_t> X.itemsize
+
+        # X.strides[1] is the number of bytes to jump to reach the beginning
+        # of the next element (in this case features) in the array.
+        # X.strides[1] = 4
+
+
+        # self.X_feature_stride is the number of indices away the next feature in the array is.
+        # self.X_feature_stride = 1, indicating that they are all consecutive.
         self.X_feature_stride = <SIZE_t> X.strides[1] / <SIZE_t> X.itemsize
 
+        # if presort is used, then set the associated class variables
+        # for the sorted inputs as well.
         if self.presort == 1:
             self.X_idx_sorted = X_idx_sorted
             self.X_idx_sorted_ptr = <INT32_t*> self.X_idx_sorted.data

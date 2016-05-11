@@ -226,7 +226,6 @@ class BaseDecisionTree(six.with_metaclass(ABCMeta, BaseEstimator,
         # convert to contiguous array if necessary
         if getattr(y, "dtype", None) != DOUBLE or not y.flags.contiguous:
             y = np.ascontiguousarray(y, dtype=DOUBLE)
-        pdb.set_trace()
         # Check parameters
         # set max_depth if it is defined, else set it to the max 32-bit int
         max_depth = ((2 ** 31) - 1 if self.max_depth is None
@@ -379,21 +378,27 @@ class BaseDecisionTree(six.with_metaclass(ABCMeta, BaseEstimator,
                              "the shape of X_idx_sorted (X_idx_sorted"
                              ".shape = {})".format(X.shape,
                                                    X_idx_sorted.shape))
-
         # Build tree
-        # create criterion object
+        # create Criterion used to evaluate splits
         criterion = self.criterion
+        # check if the criterion passed in is user-built
+        # if it is, use it.
         if not isinstance(criterion, Criterion):
             if is_classification:
                 criterion = CRITERIA_CLF[self.criterion](self.n_outputs_,
                                                          self.n_classes_)
             else:
+                # create the appropriate Criterion object
+                # based on the user's input.
                 criterion = CRITERIA_REG[self.criterion](self.n_outputs_)
- 
+        # decide whether to use dense or sparse splitters based on input data
         SPLITTERS = SPARSE_SPLITTERS if issparse(X) else DENSE_SPLITTERS
-
+        # check if the splitter passed in is user-built
+        # if it is, use it.
         splitter = self.splitter
         if not isinstance(self.splitter, Splitter):
+            # create the appropriate Splitter object
+            # based on the user's input
             splitter = SPLITTERS[self.splitter](criterion,
                                                 self.max_features_,
                                                 min_samples_leaf,
@@ -401,10 +406,15 @@ class BaseDecisionTree(six.with_metaclass(ABCMeta, BaseEstimator,
                                                 random_state,
                                                 self.presort)
         # create tree
+        # self.n_features_ = 1
+        # self.n_classes_ = array([1])
+        # self.n_outputs_ = 1
         self.tree_ = Tree(self.n_features_, self.n_classes_, self.n_outputs_)
 
         # Use BestFirst if max_leaf_nodes given; use DepthFirst otherwise
+        # max_leaf_nodes = -1
         if max_leaf_nodes < 0:
+            # our example uses the DepthFirstTreeBuilder
             builder = DepthFirstTreeBuilder(splitter, min_samples_split,
                                             min_samples_leaf,
                                             min_weight_leaf,
@@ -416,6 +426,23 @@ class BaseDecisionTree(six.with_metaclass(ABCMeta, BaseEstimator,
                                            max_depth,
                                            max_leaf_nodes)
 
+        # Build the tree with specified parameters
+        # self.tree is the Tree we initialized previously, e.g.
+        # self.tree = <sklearn.tree._tree.Tree object at 0x1045b12a0>
+
+        # X is our input vector
+        # X = [[ 1.] [ 2.] [ 5.]]
+
+        # y is our label vector
+        # y = [[ 2.] [ 3.] [ 6.]]
+
+        # sample_weights is a list of the weights of each sample
+        # sample_weights = [ 1.  2.  1.]
+
+        # X_idx_sorted are the sorted
+        # indices of the input, if presort was used
+        # X_idx_sorted = None
+        pdb.set_trace()
         builder.build(self.tree_, X, y, sample_weight, X_idx_sorted)
 
         if self.n_outputs_ == 1:

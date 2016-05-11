@@ -132,52 +132,109 @@ cdef class DepthFirstTreeBuilder(TreeBuilder):
     def __cinit__(self, Splitter splitter, SIZE_t min_samples_split,
                   SIZE_t min_samples_leaf, double min_weight_leaf,
                   SIZE_t max_depth):
-        print "entered __cinit__ of DepthFirstTreeBuilder"
+        # Splitter object to use when building the tree, e.g.
+        # <sklearn.tree._splitter.BestSplitter object at 0x104ef9490>
         self.splitter = splitter
+
+        # the minimum number of samples required
+        # to split an internal node
+        # self.min_samples_split = 2
         self.min_samples_split = min_samples_split
+
+        # the minimum number of samples required
+        # to be at a leaf node
+        # self.min_samples_leaf = 1
         self.min_samples_leaf = min_samples_leaf
+
+        # Minimum weight of input samples required
+        # to be at a leaf node
+        # self.min_weight_leaf = 0
         self.min_weight_leaf = min_weight_leaf
+
+        # max depth of the tree
+        # max_depth = 2147483647 ((2**31)-1)
         self.max_depth = max_depth
 
     cpdef build(self, Tree tree, object X, np.ndarray y,
                 np.ndarray sample_weight=None,
                 np.ndarray X_idx_sorted=None):
         """Build a decision tree from the training set (X, y)."""
-
+        print "entered build of DepthFirstTreeBuilder"
         # check input
         X, y, sample_weight = self._check_input(X, y, sample_weight)
-
         cdef DOUBLE_t* sample_weight_ptr = NULL
         if sample_weight is not None:
+            # take a numpy array and set a pointer to it
+            # sample_weight_ptr = [1.0, 2.0, 1.0]
             sample_weight_ptr = <DOUBLE_t*> sample_weight.data
 
-        # Initial capacity
+        # Initial capacity of tree
         cdef int init_capacity
 
         if tree.max_depth <= 10:
+            # manually defines the initial capacity of the tree
+            # a tree with a max_depth of 1, would simply be
+            # a root and 2 children, so init_capacity should be 3.
+
+            # if tree.max_depth <= 10, then initial capacity is the
+            # true capacity
             init_capacity = (2 ** (tree.max_depth + 1)) - 1
         else:
+            # else, initial capacity is a baseline and we can adjust later.
             init_capacity = 2047
 
+        # resizes all the inner arrays of the tree to size
+        # init_capacity
         tree._resize(init_capacity)
 
         # Parameters
+        # splitter object to use, e.g.
+        # <sklearn.tree._splitter.BestSplitter object at 0x104dfa490>
         cdef Splitter splitter = self.splitter
+
+        # tree max_depth
+        # max_depth = 2147483647
         cdef SIZE_t max_depth = self.max_depth
+
+        # minimum number of samples in a leaf node
+        # min_samples_leaf = 1
         cdef SIZE_t min_samples_leaf = self.min_samples_leaf
+
+        # minimum weight needed on a leaf node
+        # min_weight_leaf = 0
         cdef double min_weight_leaf = self.min_weight_leaf
+
+        # minimum number of samples needed to split a node
+        # min_samples_split = 2
         cdef SIZE_t min_samples_split = self.min_samples_split
 
         # Recursive partition (without actual recursion)
         splitter.init(X, y, sample_weight_ptr, X_idx_sorted)
+        print "done with splitter init"
 
+        # start index of array-represented tree to look for split
         cdef SIZE_t start
+
+        # end index of array-represented tree to look for split
         cdef SIZE_t end
+
+        # current depth in the tree
         cdef SIZE_t depth
+
+        # index of parent node
         cdef SIZE_t parent
+
+        # whether the node is a left child or not
         cdef bint is_left
+
+        # number of samples in which we are searching for the
+        # best split
         cdef SIZE_t n_node_samples = splitter.n_samples
+
+        # total weight of samples in which we are searching for
+        # the best split
         cdef double weighted_n_samples = splitter.weighted_n_samples
+
         cdef double weighted_n_node_samples
         cdef SplitRecord split
         cdef SIZE_t node_id
@@ -188,13 +245,26 @@ cdef class DepthFirstTreeBuilder(TreeBuilder):
         cdef bint is_leaf
         cdef bint first = 1
         cdef SIZE_t max_depth_seen = -1
+
+        # stores return code for the Stack's push method
         cdef int rc = 0
 
+        # a custom stack LIFO data structure written in Cython
+        # see _utils.pyx for its implementation and _utils.pxd for more info
         cdef Stack stack = Stack(INITIAL_STACK_SIZE)
+
+        # a record on the stack for depth first-tree growing
+        # see _utils.pxd for more info
         cdef StackRecord stack_record
 
         with nogil:
             # push root node onto stack
+            # see _utils.pyx for more info about the method
+            # push takes in arguments SIZE_t start, SIZE_t end,
+            # SIZE_t depth, SIZE_t parent, bint is_left, double impurity,
+            # SIZE_t n_constant_features, respectively.
+
+            # searches over the range [0, n_node_samples] for the optimal split.
             rc = stack.push(0, n_node_samples, 0, _TREE_UNDEFINED, 0, INFINITY, 0)
             if rc == -1:
                 # got return code -1 - out-of-memory
@@ -202,8 +272,11 @@ cdef class DepthFirstTreeBuilder(TreeBuilder):
                     raise MemoryError()
 
             while not stack.is_empty():
+                # removes the top element of the stack
+                # and copies it to the StackRecord stack_record
                 stack.pop(&stack_record)
 
+                # update variable with values from top element of the stack
                 start = stack_record.start
                 end = stack_record.end
                 depth = stack_record.depth
@@ -214,21 +287,35 @@ cdef class DepthFirstTreeBuilder(TreeBuilder):
 
                 n_node_samples = end - start
                 splitter.node_reset(start, end, &weighted_n_node_samples)
+                with gil:
+                    print "done with splitter node_reset in _tree.pyx"
 
+                # check if node is_leaf
                 is_leaf = ((depth >= max_depth) or
                            (n_node_samples < min_samples_split) or
                            (n_node_samples < 2 * min_samples_leaf) or
                            (weighted_n_node_samples < min_weight_leaf))
 
+                # calculate the impurity of the first node
                 if first:
                     impurity = splitter.node_impurity()
                     first = 0
+                with gil:
+                    print "done checking if first and finding impurity as appropriate"
 
                 is_leaf = is_leaf or (impurity <= MIN_IMPURITY_SPLIT)
+                with gil:
+                    print "is_leaf: {}".format(is_leaf)
 
                 if not is_leaf:
+                    with gil:
+                        print "node is not leaf, so we split it"
                     splitter.node_split(impurity, &split, &n_constant_features)
+                    with gil:
+                        print "done splitting none-leaf node"
                     is_leaf = is_leaf or (split.pos >= end)
+                    with gil:
+                        print "set is_leaf to {}".format(is_leaf)
 
                 node_id = tree._add_node(parent, is_left, is_leaf, split.feature,
                                          split.threshold, impurity, n_node_samples,
@@ -583,24 +670,50 @@ cdef class Tree:
                   int n_outputs):
         """Constructor."""
         # Input/Output layout
-        print "entered __cinit__ of _tree.pyx"
+
+        # number of features in each sample
+        # self.n_features = 1
         self.n_features = n_features
+
+        # number of outputs for each sample
+        # self.n_outputs = 1
         self.n_outputs = n_outputs
+
         self.n_classes = NULL
         safe_realloc(&self.n_classes, n_outputs)
 
+        # maximum number of classes in a sample
+        # n_classes = [1]
+        # self.max_n_classes = 1
         self.max_n_classes = np.max(n_classes)
+
+        # calculate the number of valuess
+        # between successive array elements of
+        # the same class. In this case, since
+        # there is only one class, they are all next
+        # to each other.
         self.value_stride = n_outputs * self.max_n_classes
 
         cdef SIZE_t k
+        # range(n_outputs) = [0]
+        # self.n_classes = [1]
         for k in range(n_outputs):
             self.n_classes[k] = n_classes[k]
 
         # Inner structures
+        # maximum depth of the tree
         self.max_depth = 0
+
+        # number of nodes (internal nodes + leaves) in the tree
         self.node_count = 0
+
+        # current size of the parallel arrays
         self.capacity = 0
+
+        # prediction values of each node
         self.value = NULL
+
+        # array of node objects
         self.nodes = NULL
 
     def __dealloc__(self):

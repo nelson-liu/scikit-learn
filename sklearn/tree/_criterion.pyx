@@ -697,19 +697,40 @@ cdef class RegressionCriterion(Criterion):
         """
 
         # Default values
-        print "entered __cinit__ of RegressionCriterion"
+        # array for labels
         self.y = NULL
+
+        # elements between each consecutive label in the same class
+        # y_stride = 1 in this case since we are only predicting one output
+        # per sample.
         self.y_stride = 0
+
+        # array of weights for each input sample
         self.sample_weight = NULL
 
+        # array to store the nonzero samples of the feature
+        # of interest
         self.samples = NULL
+
+        # start index to look for split
         self.start = 0
+
+        # intermediary index to split on
         self.pos = 0
+
+        # end index to look for split
         self.end = 0
 
+        # number of outputs to predict for each sample
         self.n_outputs = n_outputs
+
+        # number of samples over which we are searching for split
         self.n_node_samples = 0
+
+        # total weight of samples over which we are searching for split
         self.weighted_n_node_samples = 0.0
+
+
         self.weighted_n_left = 0.0
         self.weighted_n_right = 0.0
 
@@ -717,6 +738,8 @@ cdef class RegressionCriterion(Criterion):
 
         # Allocate accumulators. Make sure they are NULL, not uninitialized,
         # before an exception can be raised (which triggers __dealloc__).
+        # arrays to store the sum of total, left split, and right split samples
+        # in the class
         self.sum_total = NULL
         self.sum_left = NULL
         self.sum_right = NULL
@@ -732,6 +755,7 @@ cdef class RegressionCriterion(Criterion):
             raise MemoryError()
 
     def __reduce__(self):
+        print "entered __reduce__ of _criterion.pyx"
         return (RegressionCriterion, (self.n_outputs,), self.__getstate__())
 
     cdef void init(self, DOUBLE_t* y, SIZE_t y_stride, DOUBLE_t* sample_weight,
@@ -742,18 +766,41 @@ cdef class RegressionCriterion(Criterion):
         # Initialize fields
         with gil:
             print "entered init of regressionCriterion"
+        # labels of the samples we are searching for the best split over
         self.y = y
+        # elements between each consecutive label in the same class
+        # y_stride = 1 in this case since we are only predicting one output
+        # per sample.
         self.y_stride = y_stride
+        cdef SIZE_t b = 0
         with gil:
             print "self.y_stride: {}".format(self.y_stride)
+        # array of weights for each input sample
         self.sample_weight = sample_weight
+
+        # array to store the nonzero samples of the feature
+        # of interest
         self.samples = samples
+
+        # start index to look for split
         self.start = start
+
+        # end index to look for split
         self.end = end
+
+        # number of samples we are searching over
         self.n_node_samples = end - start
         self.weighted_n_samples = weighted_n_samples
+        for b in range(start,end):
+            with gil:
+                print "y[{}]: {}".format(b, y[b])
+                print "sample_weight[{}]: {}".format(b, sample_weight[b])
+                print "samples[{}]: {}".format(b, samples[b])
+        with gil:
+            print "weighted_n_samples: {}".format(weighted_n_samples)
         self.weighted_n_node_samples = 0.
 
+        # temp variables
         cdef SIZE_t i
         cdef SIZE_t p
         cdef SIZE_t k
@@ -762,10 +809,13 @@ cdef class RegressionCriterion(Criterion):
         cdef DOUBLE_t w = 1.0
 
         self.sq_sum_total = 0.0
-        with gil:
-            print "sizeof(double): {}".format(sizeof(double))
+
+        # set the space occupied by self.n_outputs elements to 0 in the
+        # self.sum_total array.
         memset(self.sum_total, 0, self.n_outputs * sizeof(double))
 
+        # populate self.sum_total, and calculate self.sq_sum_total and
+        # self.weighted_n_node_samples
         for p in range(start, end):
             i = samples[p]
 
@@ -785,6 +835,8 @@ cdef class RegressionCriterion(Criterion):
 
     cdef void reset(self) nogil:
         """Reset the criterion at pos=start."""
+        with gil:
+            print "entered reset of regressioncriterion"
         cdef SIZE_t n_bytes = self.n_outputs * sizeof(double)
         memset(self.sum_left, 0, n_bytes)
         memcpy(self.sum_right, self.sum_total, n_bytes)
@@ -795,6 +847,8 @@ cdef class RegressionCriterion(Criterion):
 
     cdef void reverse_reset(self) nogil:
         """Reset the criterion at pos=end."""
+        with gil:
+            print "entered reverse_reset of regressioncriterion"
         cdef SIZE_t n_bytes = self.n_outputs * sizeof(double)
         memset(self.sum_right, 0, n_bytes)
         memcpy(self.sum_left, self.sum_total, n_bytes)
@@ -805,7 +859,8 @@ cdef class RegressionCriterion(Criterion):
 
     cdef void update(self, SIZE_t new_pos) nogil:
         """Updated statistics by moving samples[pos:new_pos] to the left."""
-
+        with gil:
+            print "entered update of regressioncriterion"
         cdef double* sum_left = self.sum_left
         cdef double* sum_right = self.sum_right
         cdef double* sum_total = self.sum_total
@@ -896,14 +951,15 @@ cdef class MSE(RegressionCriterion):
     cdef double node_impurity(self) nogil:
         """Evaluate the impurity of the current node, i.e. the impurity of
            samples[start:end]."""
-
+        with gil:
+            print "entered node_impurity"
         cdef double* sum_total = self.sum_total
         cdef double impurity
         cdef SIZE_t k
         # sq_sum_total is the sum of squares of the predicted labels
         with gil:
             print("sq_sum_total: {}".format(self.sq_sum_total))
-        
+
         # decision tree takes in a sample weight parameter
         # this is the sum of the weights
         with gil:

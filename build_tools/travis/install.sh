@@ -11,7 +11,7 @@
 # matrix entry) from which we pull from local Travis repository. This allows
 # us to keep build artefact for gcc + cython, and gain time
 
-set -e
+set -ev
 
 # Fix the compilers to workaround avoid having the Python 3.4 build
 # lookup for g++44 unexpectedly.
@@ -112,6 +112,7 @@ else
     python --version
     python -c "import numpy; print('numpy %s' % numpy.__version__)"
     python -c "import scipy; print('scipy %s' % scipy.__version__)"
+    exit 1
     python setup.py develop
 fi
 
